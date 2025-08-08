@@ -7,19 +7,25 @@ import os
 
 def get_techcrunch_headlines():
     url = 'https://techcrunch.com/'
-    response = requests.get(url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+    }
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        return ["Failed to fetch TechCrunch page."]
+
     soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Find the first 3 headline blocks
-    articles = soup.select('div.post-block')[:3]
+    links = soup.select("h2.post-block__title a.post-block__title__link")
     headlines = []
+
+    for link in links[:3]:
+        title = link.get_text(strip=True)
+        url = link.get('href')
+        headlines.append(f"{title}\n{url}")
     
-    for article in articles:
-        title_tag = article.select_one('h2.post-block__title a')
-        if title_tag:
-            title = title_tag.get_text(strip=True)
-            link = title_tag['href']
-            headlines.append(f"{title}\n{link}")
+    if not headlines:
+        return ["No headlines found. TechCrunch structure might have changed."]
     
     return headlines
 
@@ -28,7 +34,7 @@ def send_email(subject, body):
     recipient = os.getenv("EMAIL_RECIPIENT")
     password = os.getenv("EMAIL_PASSWORD")
 
-    msg = MIMEText(body)
+    msg = MIMEText(body, "plain")
     msg['Subject'] = subject
     msg['From'] = sender
     msg['To'] = recipient
@@ -39,10 +45,6 @@ def send_email(subject, body):
 
 if __name__ == "__main__":
     headlines = get_techcrunch_headlines()
-    if headlines:
-        body = "\n\n".join(headlines)
-    else:
-        body = "No headlines found. TechCrunch structure might have changed."
-
+    body = "\n\n".join(headlines)
     subject = f"Top TechCrunch Headlines - {datetime.now().strftime('%Y-%m-%d')}"
     send_email(subject, body)
